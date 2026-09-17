@@ -1,0 +1,138 @@
+NOTE: log in to open vpn server
+
+
+
+# ============================================================
+# 1. Check OpenVPN Access Server
+# ============================================================
+
+systemctl status openvpnas --no-pager
+
+# EXPECTED:
+# Active: active (running)
+
+
+# ============================================================
+# 2. Go to OpenVPN Access Server scripts
+# ============================================================
+
+cd /usr/local/openvpn_as/scripts
+
+# EXPECTED:
+# You should now be in:
+# /usr/local/openvpn_as/scripts
+
+
+# ============================================================
+# 3. Confirm Access Server configuration method
+# ============================================================
+
+grep OPENVPN_AS_CONFIG sacli
+
+# EXPECTED:
+# export OPENVPN_AS_CONFIG="/usr/local/openvpn_as/etc/as.conf"
+
+
+# ============================================================
+# 4. Take a backup BEFORE making changes
+# ============================================================
+
+./sacli ConfigQuery > /root/openvpn_config_backup_$(date +%F-%H%M%S).txt
+
+# EXPECTED:
+# No output means the command completed successfully.
+
+
+# ============================================================
+# 5. Verify backup file was created
+# ============================================================
+
+ls -lt /root/openvpn_config_backup_*.txt
+
+# EXPECTED:
+# The newest file should be shown, for example:
+# /root/openvpn_config_backup_2026-09-09-095500.txt
+
+
+# ============================================================
+# 6. Check CURRENT routing configuration
+# ============================================================
+
+./sacli ConfigQuery | grep -Ei 'vpn.server.routing.private_network'
+
+# EXPECTED BEFORE CHANGE:
+# "vpn.server.routing.private_network.0": "192.168.0.0/22",
+
+
+# ============================================================
+# 7. ADD 192.168.4.0/22
+# ============================================================
+
+./sacli --key "vpn.server.routing.private_network.1" --value "192.168.4.0/22" ConfigPut
+
+# EXPECTED:
+# No output means the command completed successfully.
+
+
+# ============================================================
+# 8. ADD 10.100.0.0/16
+# ============================================================
+
+./sacli --key "vpn.server.routing.private_network.2" --value "10.100.0.0/16" ConfigPut
+
+# EXPECTED:
+# No output means the command completed successfully.
+
+
+# ============================================================
+# 9. VERIFY ALL ROUTES
+# ============================================================
+
+./sacli ConfigQuery | grep -Ei 'vpn.server.routing.private_network'
+
+# EXPECTED:
+# "vpn.server.routing.private_network.0": "192.168.0.0/22",
+# "vpn.server.routing.private_network.1": "192.168.4.0/22",
+# "vpn.server.routing.private_network.2": "10.100.0.0/16",
+
+
+# ============================================================
+# 10. RESTART OPENVPN ACCESS SERVER
+# ============================================================
+
+sudo systemctl restart openvpnas
+
+# EXPECTED:
+# No output means restart command completed successfully.
+
+
+# ============================================================
+# 11. CHECK SERVICE STATUS
+# ============================================================
+
+sudo systemctl status openvpnas --no-pager
+
+# EXPECTED:
+# Active: active (running)
+
+
+# ============================================================
+# 12. FINAL SERVICE CHECK
+# ============================================================
+
+sudo systemctl is-active openvpnas
+
+# EXPECTED:
+# active
+
+
+# ============================================================
+# 13. FINAL ROUTING CONFIGURATION CHECK
+# ============================================================
+
+./sacli ConfigQuery | grep -Ei 'vpn.server.routing.private_network'
+
+# EXPECTED:
+# "vpn.server.routing.private_network.0": "192.168.0.0/22",
+# "vpn.server.routing.private_network.1": "192.168.4.0/22",
+# "vpn.server.routing.private_network.2": "10.100.0.0/16",

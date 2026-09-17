@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Runbook: Deletion of Stopped RDS Instances</title>
+<style>
+  body {
+    font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+    max-width: 850px;
+    margin: 40px auto;
+    padding: 0 20px;
+    color: #1a1a1a;
+    line-height: 1.6;
+  }
+  h1 { border-bottom: 3px solid #ff9900; padding-bottom: 10px; }
+  h2 {
+    color: #232f3e;
+    margin-top: 32px;
+    border-left: 4px solid #ff9900;
+    padding-left: 10px;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0;
+  }
+  th, td {
+    border: 1px solid #ccc;
+    padding: 8px 12px;
+    text-align: left;
+  }
+  th { background-color: #232f3e; color: white; }
+  .meta { color: #555; font-size: 0.95em; }
+  .checkpoint {
+    background: #fff8e1;
+    border-left: 4px solid #ff9900;
+    padding: 10px 14px;
+    margin: 12px 0;
+  }
+  .note {
+    background: #e8f4fd;
+    border-left: 4px solid #0073bb;
+    padding: 10px 14px;
+    margin: 12px 0;
+  }
+  ol { padding-left: 22px; }
+  code {
+    background: #f0f0f0;
+    padding: 2px 5px;
+    border-radius: 3px;
+    font-family: Consolas, monospace;
+  }
+  footer { margin-top: 40px; font-style: italic; color: #777; text-align: center; }
+</style>
+</head>
+<body>
+
+<h1>Runbook: Deletion of Stopped RDS Instances</h1>
+<p class="meta">
+  <strong>Environment:</strong> AWS RDS (ap-south-1)<br>
+  <strong>Owner:</strong> Muthu S S<br>
+  <strong>Last Updated:</strong> 15-Sep-2026
+</p>
+
+<h2>Purpose</h2>
+<p>Safely delete stopped/unused RDS instances identified in the Databases console, with a mandatory backup step for the production database.</p>
+
+<h2>Scope</h2>
+<table>
+  <tr><th>DB Identifier</th><th>Type</th><th>Backup Required</th></tr>
+  <tr><td>javelin-production-live</td><td>RDS Instance (MySQL Community)</td><td>Yes</td></tr>
+  <tr><td>migration-test-aurora-cluster (incl. migration-test-aurora)</td><td>Aurora MySQL Cluster</td><td>No</td></tr>
+  <tr><td>testing-rds-new</td><td>RDS Instance (MySQL Community)</td><td>No</td></tr>
+</table>
+
+<h2>Prerequisites</h2>
+<ul>
+  <li>IAM permissions: <code>rds:DeleteDBInstance</code>, <code>rds:DeleteDBCluster</code>, <code>rds:CreateDBSnapshot</code>, <code>rds:DescribeDBInstances</code></li>
+  <li>Confirm no active application/service is still dependent on these databases</li>
+  <li>Confirm with stakeholders before touching <code>javelin-production-live</code> (production)</li>
+</ul>
+
+<h2>Step 1 — Take a Manual Snapshot of Production DB</h2>
+<ol>
+  <li>Open AWS Console → RDS → Databases</li>
+  <li>Select <code>javelin-production-live</code></li>
+  <li>Click <strong>Actions</strong> → <strong>Take snapshot</strong></li>
+  <li>Snapshot name: <code>javelin-production-live-final-backup-YYYYMMDD</code></li>
+  <li>Wait until snapshot status = <strong>Available</strong> (check under Snapshots → Manual)</li>
+</ol>
+<div class="checkpoint"><strong>Checkpoint:</strong> Do not proceed to Step 2 until the snapshot shows Available.</div>
+
+<h2>Step 2 — Delete javelin-production-live</h2>
+<ol>
+  <li>Select <code>javelin-production-live</code></li>
+  <li>Click <strong>Actions</strong> → <strong>Delete</strong></li>
+  <li>In the confirmation dialog:
+    <ul>
+      <li>Uncheck "Create final snapshot" (already taken manually)</li>
+      <li>Uncheck "Retain automated backups" (unless policy requires retention)</li>
+      <li>Type the required confirmation text</li>
+    </ul>
+  </li>
+  <li>Click <strong>Delete</strong></li>
+  <li>Verify instance disappears from the active Databases list</li>
+</ol>
+
+<h2>Step 3 — Delete migration-test-aurora-cluster</h2>
+<div class="note">Note: <code>migration-test-aurora</code> is a writer instance inside this cluster. Deleting the cluster removes the instance with it.</div>
+<ol>
+  <li>Select <code>migration-test-aurora-cluster</code> (the cluster, not the instance)</li>
+  <li>Click <strong>Actions</strong> → <strong>Delete</strong></li>
+  <li>Uncheck "Create final snapshot" (test resource, not required)</li>
+  <li>Type the confirmation text</li>
+  <li>Click <strong>Delete</strong></li>
+  <li>Verify both the cluster and <code>migration-test-aurora</code> instance are removed</li>
+</ol>
+
+<h2>Step 4 — Delete testing-rds-new</h2>
+<ol>
+  <li>Select <code>testing-rds-new</code></li>
+  <li>Click <strong>Actions</strong> → <strong>Delete</strong></li>
+  <li>Uncheck "Create final snapshot" and "Retain automated backups"</li>
+  <li>Type the confirmation text</li>
+  <li>Click <strong>Delete</strong></li>
+  <li>Verify it disappears from the Databases list</li>
+</ol>
+
+<h2>Step 5 — Post-Deletion Verification</h2>
+<ol>
+  <li>Refresh RDS → Databases and confirm the count dropped by 3 (8 → 5)</li>
+  <li>Confirm remaining databases (Available ones) are unaffected</li>
+  <li>Confirm the manual snapshot for <code>javelin-production-live</code> is visible under Snapshots</li>
+  <li>Notify stakeholders that the deletion activity is complete</li>
+</ol>
+
+<h2>Rollback / Recovery</h2>
+<ul>
+  <li>If <code>javelin-production-live</code> needs to be restored, use <strong>RDS → Snapshots → Manual → Restore Snapshot</strong> with the snapshot taken in Step 1.</li>
+  <li>Test/migration resources (<code>migration-test-aurora</code>, <code>testing-rds-new</code>) have no snapshot and cannot be recovered once deleted — confirm before proceeding if this changes.</li>
+</ul>
+
+<h2>Sign-off</h2>
+<table>
+  <tr><th>Role</th><th>Name</th><th>Date</th></tr>
+  <tr><td>Performed by</td><td>Muthu S S</td><td></td></tr>
+  <tr><td>Approved by</td><td></td><td></td></tr>
+</table>
+
+<footer>End of runbook</footer>
+
+</body>
+</html>

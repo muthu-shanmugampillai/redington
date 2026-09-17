@@ -1,0 +1,12 @@
+ssh -p <PORT> -i <KEY_FILE> <USERNAME>@<SERVER_IP>
+-----------------------------------------------------------------
+ssm agent
+
+#!/bin/bash
+ 
+if ! snap list amazon-ssm-agent >/dev/null 2>&1; then
+    snap install amazon-ssm-agent --classic
+fi
+ 
+snap start amazon-ssm-agent
+------------------------------------------------------------------------

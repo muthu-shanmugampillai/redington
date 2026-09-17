@@ -1,0 +1,36 @@
+# Account Credentials
+-----------------------------------
+1. Kaleyra Toll-Free Portal
+-----------------------------------
+URL       : https://voice.kaleyra.com
+Username  : Muthushanmugam
+Email ID  : [muthu.shanmugam@redingtongroup.com]
+
+-------------------------------------
+2. Site24x7 Monitoring Tool
+-------------------------------------
+URL       : https://www.site24x7.com/
+Username  : [muthu.shanmugam@redingtongroup.com]
+
+----------------------------------------
+DL list:
+----------------------------------------
+aws.support.ril@redingtongroup.com
+azure.support@redingtongroup.com
+gcp.support@redingtongroup.com
+cloudmanagedservices.in@redingtongroup.com
+plessupport.india@redingtongroup.com
+gcpples.support@redingtongroup.com
+
+------------------------------------------------------
+SharePoint Link:
+------------------------------------------------------
+https://redingtonscmind.sharepoint.com/sites/MSSupportteam/Shared%20Documents/Forms/AllItems.aspx
+
+---------------------------------------------------------
+sheenlac-openvpn creds
+--------------------------------------------------------
+3.111.250.160
+Saiteck
+JRTel0rV
+----------------------------------------------------------
