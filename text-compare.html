@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Text Comparator</title>
+<script>
+  (function () {
+    var t = null;
+    try { t = localStorage.getItem('tc-theme'); } catch (e) {}
+    if (t !== 'light' && t !== 'dark')
+      t = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme', t);
+  })();
+</script>
+<style>
+  :root {
+    color-scheme: light;
+    --bg: #f4f6fa; --panel: #ffffff; --panel2: #f0f3f9; --border: #d5dbe6;
+    --text: #1f2937; --muted: #6b7280; --accent: #2563eb; --accent-h: #1d4ed8;
+    --hover: #e6ecf7; --hover-b: #b8c4da; --gutter: #f6f8fb; --caret: #111; --sel: rgba(37,99,235,.25);
+    --shadow: 0 1px 2px rgba(16,24,40,.05);
+    --add: rgba(34,160,70,.20); --del: rgba(220,53,69,.18); --chg: rgba(230,170,20,.28);
+    --add-w: rgba(34,160,70,.45); --del-w: rgba(220,53,69,.42); --chg-w: rgba(214,140,0,.50);
+    --add-solid: #1a7f37; --del-solid: #cf222e; --chg-solid: #9a6700;
+    --lh: 20px; --pad: 8px;
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0d1117; --panel: #111827; --panel2: #161e2e; --border: #263043;
+    --text: #d6deeb; --muted: #7d8aa3; --accent: #4c8dff; --accent-h: #3a7bf0;
+    --hover: #1d2840; --hover-b: #35476a; --gutter: #0f1522; --caret: #fff; --sel: rgba(76,141,255,.45);
+    --shadow: none;
+    --add: rgba(63,185,80,.24); --del: rgba(248,81,73,.24); --chg: rgba(210,153,34,.28);
+    --add-w: rgba(63,185,80,.48); --del-w: rgba(248,81,73,.48); --chg-w: rgba(210,153,34,.55);
+    --add-solid: #3fb950; --del-solid: #f85149; --chg-solid: #d29922;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; flex-direction: column; gap: 10px; padding: 12px;
+  }
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px;
+  }
+  .toolbar, .pane, .statusbar { box-shadow: var(--shadow); }
+  .brand { font-weight: 600; letter-spacing: .3px; margin-right: auto; }
+  .brand span { color: var(--accent); }
+  .group { display: flex; align-items: center; gap: 6px; }
+  .opts { gap: 12px; font-size: 13px; }
+  .opt { display: flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+  .opt input { accent-color: var(--accent); }
+  button {
+    background: var(--panel2); color: var(--text); border: 1px solid var(--border);
+    border-radius: 8px; padding: 6px 14px; font: inherit; font-size: 13px; cursor: pointer;
+    transition: background .15s, border-color .15s;
+  }
+  button:hover { background: var(--hover); border-color: var(--hover-b); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.primary:hover { background: var(--accent-h); }
+  button.small { padding: 3px 10px; font-size: 12px; }
+  #navInfo { font: 13px ui-monospace, Consolas, monospace; min-width: 52px; text-align: center; color: var(--muted); }
+  .stats { display: flex; gap: 8px; font-family: ui-monospace, Consolas, monospace; font-size: 13px; }
+  .stat { padding: 3px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--panel2); }
+  .stat.add { color: var(--add-solid); } .stat.del { color: var(--del-solid); } .stat.chg { color: var(--chg-solid); }
+
+  .panes { flex: 1; min-height: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .pane {
+    display: flex; flex-direction: column; min-height: 0; min-width: 0;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: hidden;
+  }
+  .pane.drag { border-color: var(--accent); box-shadow: 0 0 0 3px var(--sel); }
+  .pane-title {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 12px; font-size: 12px; text-transform: uppercase; letter-spacing: .8px;
+    color: var(--muted); border-bottom: 1px solid var(--border); background: var(--panel2);
+  }
+  .pane-body { flex: 1; min-height: 0; display: flex; }
+  .gutter {
+    width: 48px; flex: none; overflow: hidden; position: relative;
+    background: var(--gutter); border-right: 1px solid var(--border);
+    font: 12px/var(--lh) ui-monospace, "SF Mono", Consolas, monospace; color: var(--muted); text-align: right;
+  }
+  .gutter-inner { position: absolute; left: 0; right: 0; top: 0; padding: var(--pad) 8px; will-change: transform; }
+  .gutter-inner div { height: var(--lh); border-right: 3px solid transparent; margin-right: -8px; padding-right: 5px; }
+  .gutter-inner .a { color: var(--add-solid); border-right-color: var(--add-solid); }
+  .gutter-inner .d { color: var(--del-solid); border-right-color: var(--del-solid); }
+  .gutter-inner .c { color: var(--chg-solid); border-right-color: var(--chg-solid); }
+
+  .editor { position: relative; flex: 1; min-width: 0; }
+  .overlay { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+  .overlay-inner { position: absolute; top: 0; left: 0; right: 0; padding-top: var(--pad); will-change: transform; }
+  .overlay-inner div {
+    height: var(--lh); padding-left: 10px; white-space: pre; color: transparent; tab-size: 4;
+    font: 13px/var(--lh) ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+  }
+  .overlay-inner .a { background: var(--add); }
+  .overlay-inner .d { background: var(--del); }
+  .overlay-inner .c { background: var(--chg); }
+  .overlay-inner mark { color: transparent; background: var(--chg-w); border-radius: 2px; }
+  textarea {
+    position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1;
+    margin: 0; border: 0; outline: 0; resize: none; background: transparent; color: var(--text);
+    font: 13px/var(--lh) ui-monospace, "SF Mono", Consolas, "Liberation Mono", monospace;
+    padding: var(--pad) 10px; white-space: pre; overflow: auto; tab-size: 4; caret-color: var(--caret);
+  }
+  textarea::placeholder { color: var(--muted); opacity: .85; }
+  textarea::selection { background: var(--sel); }
+
+  .statusbar {
+    display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center;
+    background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 8px 14px; font-size: 12px; color: var(--muted);
+  }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; }
+  .sw { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
+  .sw.a { background: var(--add-solid); } .sw.d { background: var(--del-solid); } .sw.c { background: var(--chg-solid); }
+  .sw.u { background: transparent; border: 1px solid var(--muted); }
+  #info { margin-left: auto; font-family: ui-monospace, Consolas, monospace; }
+
+  @media (max-width: 800px) {
+    html, body { height: auto; }
+    .panes { grid-template-columns: 1fr; }
+    .pane { height: 45vh; min-height: 260px; }
+    #info { margin-left: 0; }
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar">
+  <div class="brand">Text <span>Comparator</span></div>
+  <div class="stats">
+    <span class="stat add" title="Added lines">+ <b id="sAdd">0</b></span>
+    <span class="stat del" title="Removed lines">&minus; <b id="sDel">0</b></span>
+    <span class="stat chg" title="Changed lines">&ne; <b id="sChg">0</b></span>
+  </div>
+  <div class="group" title="Jump between differences (F7 / F8)">
+    <button id="btnPrev">&#9650; Prev</button>
+    <span id="navInfo">&ndash;/0</span>
+    <button id="btnNext">Next &#9660;</button>
+  </div>
+  <div class="group opts">
+    <label class="opt"><input type="checkbox" id="oWs"> Ignore whitespace</label>
+    <label class="opt"><input type="checkbox" id="oCase"> Ignore case</label>
+    <label class="opt"><input type="checkbox" id="oBlank"> Ignore blank lines</label>
+    <label class="opt" title="On: both editors scroll together. Off: each editor scrolls on its own."><input type="checkbox" id="oSync" checked> Sync scroll</label>
+  </div>
+  <div class="group">
+    <button class="primary" id="btnCompare">Compare</button>
+    <button id="btnClear">Clear all</button>
+    <button id="btnTheme" title="Switch between light and dark mode"></button>
+  </div>
+</div>
+
+<div class="panes">
+  <section class="pane" id="paneL">
+    <div class="pane-title"><span>Original text</span>
+      <button class="small" data-load="L">Load file</button><input type="file" hidden id="fileL"></div>
+    <div class="pane-body">
+      <div class="gutter"><div class="gutter-inner" id="gutLi"></div></div>
+      <div class="editor">
+        <div class="overlay"><div class="overlay-inner" id="ovL"></div></div>
+        <textarea id="taL" spellcheck="false" wrap="off" placeholder="ORIGINAL text - paste, type or drop a file here.&#10;&#10;How to use:&#10; Compare        re-run the comparison&#10; Prev / Next    jump between differences (F7 / F8)&#10; Clear all      empty both editors&#10; Load file      open a text file (or drag it here)" aria-label="Original text"></textarea>
+      </div>
+    </div>
+  </section>
+  <section class="pane" id="paneR">
+    <div class="pane-title"><span>Modified text</span>
+      <button class="small" data-load="R">Load file</button><input type="file" hidden id="fileR"></div>
+    <div class="pane-body">
+      <div class="gutter"><div class="gutter-inner" id="gutRi"></div></div>
+      <div class="editor">
+        <div class="overlay"><div class="overlay-inner" id="ovR"></div></div>
+        <textarea id="taR" spellcheck="false" wrap="off" placeholder="MODIFIED text - paste, type or drop a file here.&#10;&#10;Options:&#10; Ignore whitespace     ignore spacing differences&#10; Ignore case           treat A and a as equal&#10; Ignore blank lines    skip empty lines&#10; Sync scroll           on: both scroll together&#10;                       off: scroll each editor alone&#10;&#10;Colors:&#10; green = added   red = removed   yellow = changed&#10; darker yellow = the exact words that changed" aria-label="Modified text"></textarea>
+      </div>
+    </div>
+  </section>
+</div>
+
+<div class="statusbar">
+  <div class="legend">
+    <span><i class="sw a"></i>Added</span>
+    <span><i class="sw d"></i>Removed</span>
+    <span><i class="sw c"></i>Changed (darker = changed words)</span>
+    <span><i class="sw u"></i>Unchanged</span>
+  </div>
+  <div id="info"></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+  var LH = 20;
+  var taL = $('taL'), taR = $('taR');
+  var ovL = $('ovL'), ovR = $('ovR'), gutLi = $('gutLi'), gutRi = $('gutRi');
+  var blocks = [], cur = -1;
+
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function getOpts() { return { ws: $('oWs').checked, ic: $('oCase').checked, ib: $('oBlank').checked }; }
+  function normLine(s, o) {
+    if (o.ws) s = s.replace(/\s+/g, ' ').trim();
+    if (o.ic) s = s.toLowerCase();
+    return s;
+  }
+
+  /* ---------- Line diff (LCS) ---------- */
+  function diffLines(a, b) {
+    var n = a.length, m = b.length, start = 0, i, j;
+    while (start < n && start < m && a[start] === b[start]) start++;
+    var endA = n, endB = m;
+    while (endA > start && endB > start && a[endA - 1] === b[endB - 1]) { endA--; endB--; }
+
+    var ops = [];
+    for (i = 0; i < start; i++) ops.push({ t: 'eq', a: i, b: i });
+    var an = endA - start, bn = endB - start, w = bn + 1;
+    var dp = new Uint32Array((an + 1) * w);
+    for (i = an - 1; i >= 0; i--)
+      for (j = bn - 1; j >= 0; j--)
+        dp[i * w + j] = a[start + i] === b[start + j]
+          ? dp[(i + 1) * w + j + 1] + 1
+          : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+    i = 0; j = 0;
+    while (i < an && j < bn) {
+      if (a[start + i] === b[start + j]) { ops.push({ t: 'eq', a: start + i, b: start + j }); i++; j++; }
+      else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) { ops.push({ t: 'del', a: start + i }); i++; }
+      else { ops.push({ t: 'add', b: start + j }); j++; }
+    }
+    while (i < an) { ops.push({ t: 'del', a: start + i }); i++; }
+    while (j < bn) { ops.push({ t: 'add', b: start + j }); j++; }
+    for (i = endA, j = endB; i < n; i++, j++) ops.push({ t: 'eq', a: i, b: j });
+    return ops;
+  }
+
+  /* ---------- Word-level diff inside a changed line ---------- */
+  var TOK = /\s+|\w+|[^\w\s]/g;
+  function tokKey(t, o) {
+    if (o.ws && /^\s+$/.test(t)) return ' ';
+    return o.ic ? t.toLowerCase() : t;
+  }
+  function markHtml(t, f) {
+    var h = '', open = false;
+    for (var i = 0; i < t.length; i++) {
+      if (f[i] && !open) { h += '<mark>'; open = true; }
+      else if (!f[i] && open) { h += '</mark>'; open = false; }
+      h += esc(t[i]);
+    }
+    return open ? h + '</mark>' : h;
+  }
+  function wordDiff(x, y, o) {
+    var tx = x.match(TOK) || [], ty = y.match(TOK) || [];
+    var kx = tx.map(function (t) { return tokKey(t, o); });
+    var ky = ty.map(function (t) { return tokKey(t, o); });
+    var fx = new Array(tx.length).fill(true), fy = new Array(ty.length).fill(true);
+    var n = kx.length, m = ky.length, s = 0, i, j;
+    while (s < n && s < m && kx[s] === ky[s]) { fx[s] = false; fy[s] = false; s++; }
+    var en = n, em = m;
+    while (en > s && em > s && kx[en - 1] === ky[em - 1]) { en--; em--; fx[en] = false; fy[em] = false; }
+    var an = en - s, bn = em - s;
+    if (an > 0 && bn > 0 && an * bn <= 40000) {
+      var w = bn + 1, dp = new Uint16Array((an + 1) * w);
+      for (i = an - 1; i >= 0; i--)
+        for (j = bn - 1; j >= 0; j--)
+          dp[i * w + j] = kx[s + i] === ky[s + j]
+            ? dp[(i + 1) * w + j + 1] + 1
+            : Math.max(dp[(i + 1) * w + j], dp[i * w + j + 1]);
+      i = 0; j = 0;
+      while (i < an && j < bn) {
+        if (kx[s + i] === ky[s + j]) { fx[s + i] = false; fy[s + j] = false; i++; j++; }
+        else if (dp[(i + 1) * w + j] >= dp[i * w + j + 1]) i++; else j++;
+      }
+    }
+    return [markHtml(tx, fx), markHtml(ty, fy)];
+  }
+
+  /* ---------- Classify lines ---------- */
+  function classify(a, b, o) {
+    var ia = [], ib = [], ka = [], kb = [], i;
+    for (i = 0; i < a.length; i++) if (!(o.ib && a[i].trim() === '')) { ia.push(i); ka.push(normLine(a[i], o)); }
+    for (i = 0; i < b.length; i++) if (!(o.ib && b[i].trim() === '')) { ib.push(i); kb.push(normLine(b[i], o)); }
+    var ops = diffLines(ka, kb);
+    var r = { mL: [], mR: [], wL: [], wR: [], blocks: [], add: 0, del: 0, chg: 0 };
+    var k = 0, curA = 0, curB = 0;
+    while (k < ops.length) {
+      if (ops[k].t === 'eq') { curA = ia[ops[k].a] + 1; curB = ib[ops[k].b] + 1; k++; continue; }
+      var dels = [], adds = [], sA = curA, sB = curB;
+      while (k < ops.length && ops[k].t !== 'eq') {
+        if (ops[k].t === 'del') dels.push(ia[ops[k].a]); else adds.push(ib[ops[k].b]);
+        k++;
+      }
+      var pairs = Math.min(dels.length, adds.length), p;
+      for (p = 0; p < pairs; p++) {
+        r.mL[dels[p]] = 'c'; r.mR[adds[p]] = 'c'; r.chg++;
+        var wd = wordDiff(a[dels[p]], b[adds[p]], o);
+        r.wL[dels[p]] = wd[0]; r.wR[adds[p]] = wd[1];
+      }
+      for (p = pairs; p < dels.length; p++) { r.mL[dels[p]] = 'd'; r.del++; }
+      for (p = pairs; p < adds.length; p++) { r.mR[adds[p]] = 'a'; r.add++; }
+      r.blocks.push({ l: dels.length ? dels[0] : sA, r: adds.length ? adds[0] : sB, lc: dels.length, rc: adds.length });
+      if (dels.length) curA = dels[dels.length - 1] + 1;
+      if (adds.length) curB = adds[adds.length - 1] + 1;
+    }
+    return r;
+  }
+
+  /* ---------- Rendering ---------- */
+  function bars(marks, words, count) {
+    var h = '';
+    for (var i = 0; i < count; i++)
+      h += '<div' + (marks[i] ? ' class="' + marks[i] + '"' : '') + '>' + (words[i] || '') + '</div>';
+    return h;
+  }
+  function nums(marks, count) {
+    var h = '';
+    for (var i = 0; i < count; i++)
+      h += '<div' + (marks[i] ? ' class="' + marks[i] + '"' : '') + '>' + (i + 1) + '</div>';
+    return h;
+  }
+
+  function compare() {
+    var a = taL.value.split('\n'), b = taR.value.split('\n');
+    var r = classify(a, b, getOpts());
+    ovL.innerHTML = bars(r.mL, r.wL, a.length);
+    ovR.innerHTML = bars(r.mR, r.wR, b.length);
+    gutLi.innerHTML = nums(r.mL, a.length);
+    gutRi.innerHTML = nums(r.mR, b.length);
+    $('sAdd').textContent = r.add;
+    $('sDel').textContent = r.del;
+    $('sChg').textContent = r.chg;
+    $('info').textContent = (!taL.value && !taR.value)
+      ? 'Paste or load text into both panels to compare'
+      : 'Original: ' + a.length + ' lines  |  Modified: ' + b.length + ' lines' +
+        (r.blocks.length ? '' : '  |  No differences');
+    blocks = r.blocks;
+    if (cur >= blocks.length) cur = blocks.length - 1;
+    updateNav();
+    applyScroll();
+  }
+
+  function applyScroll() {
+    var l = 'translateY(' + (-taL.scrollTop) + 'px)', r = 'translateY(' + (-taR.scrollTop) + 'px)';
+    ovL.style.transform = l; gutLi.style.transform = l;
+    ovR.style.transform = r; gutRi.style.transform = r;
+    ovL.style.minWidth = taL.scrollWidth + 'px'; ovR.style.minWidth = taR.scrollWidth + 'px';
+    ovL.style.left = (-taL.scrollLeft) + 'px'; ovR.style.left = (-taR.scrollLeft) + 'px';
+  }
+
+  /* ---------- Scroll sync ---------- */
+  var syncing = false;
+  function onScroll(src, dst) {
+    return function () {
+      if (syncing) return;
+      if (!$('oSync').checked) { applyScroll(); return; }   // independent scrolling
+      syncing = true;
+      dst.scrollTop = src.scrollTop;
+      dst.scrollLeft = src.scrollLeft;
+      applyScroll();
+      requestAnimationFrame(function () { syncing = false; });
+    };
+  }
+  $('oSync').addEventListener('change', function () {
+    if (this.checked) { taR.scrollTop = taL.scrollTop; taR.scrollLeft = taL.scrollLeft; }
+    applyScroll();
+  });
+  taL.addEventListener('scroll', onScroll(taL, taR));
+  taR.addEventListener('scroll', onScroll(taR, taL));
+
+  /* ---------- Next / previous difference ---------- */
+  function updateNav() {
+    $('navInfo').textContent = (cur >= 0 ? cur + 1 : '\u2013') + '/' + blocks.length;
+  }
+  function go(dir) {
+    if (!blocks.length) return;
+    cur = cur < 0 ? (dir > 0 ? 0 : blocks.length - 1) : (cur + dir + blocks.length) % blocks.length;
+    var b = blocks[cur];
+    if ($('oSync').checked) {
+      var ta = b.lc ? taL : taR, line = b.lc ? b.l : b.r;
+      ta.scrollTop = Math.max(0, line * LH - ta.clientHeight / 3);
+    } else {
+      taL.scrollTop = Math.max(0, b.l * LH - taL.clientHeight / 3);
+      taR.scrollTop = Math.max(0, b.r * LH - taR.clientHeight / 3);
+    }
+    updateNav();
+  }
+  $('btnNext').addEventListener('click', function () { go(1); });
+  $('btnPrev').addEventListener('click', function () { go(-1); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'F8') { e.preventDefault(); go(1); }
+    else if (e.key === 'F7') { e.preventDefault(); go(-1); }
+  });
+
+  /* ---------- Real-time updates & controls ---------- */
+  var pending = false;
+  function schedule() {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(function () { pending = false; compare(); });
+  }
+  taL.addEventListener('input', schedule);
+  taR.addEventListener('input', schedule);
+  ['oWs', 'oCase', 'oBlank'].forEach(function (id) { $(id).addEventListener('change', compare); });
+  $('btnCompare').addEventListener('click', compare);
+  $('btnClear').addEventListener('click', function () {
+    taL.value = ''; taR.value = '';
+    taL.scrollTop = taR.scrollTop = taL.scrollLeft = taR.scrollLeft = 0;
+    cur = -1; compare(); taL.focus();
+  });
+  window.addEventListener('resize', applyScroll);
+
+  /* ---------- File loading (button + drag & drop) ---------- */
+  function loadFile(ta, file) {
+    if (!file) return;
+    var fr = new FileReader();
+    fr.onload = function () {
+      ta.value = String(fr.result);
+      ta.scrollTop = 0; ta.scrollLeft = 0;
+      cur = -1; compare();
+    };
+    fr.readAsText(file);
+  }
+  [['L', taL], ['R', taR]].forEach(function (p) {
+    var pane = $('pane' + p[0]), input = $('file' + p[0]);
+    pane.querySelector('[data-load]').addEventListener('click', function () { input.click(); });
+    input.addEventListener('change', function () { loadFile(p[1], input.files[0]); input.value = ''; });
+    pane.addEventListener('dragover', function (e) { e.preventDefault(); pane.classList.add('drag'); });
+    pane.addEventListener('dragleave', function () { pane.classList.remove('drag'); });
+    pane.addEventListener('drop', function (e) {
+      e.preventDefault(); pane.classList.remove('drag');
+      loadFile(p[1], e.dataTransfer.files[0]);
+    });
+  });
+
+  /* ---------- Light / dark theme ---------- */
+  var root = document.documentElement, btnTheme = $('btnTheme');
+  function paintThemeBtn() {
+    btnTheme.textContent = root.getAttribute('data-theme') === 'dark' ? '\u2600 Light mode' : '\u263E Dark mode';
+  }
+  btnTheme.addEventListener('click', function () {
+    var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try { localStorage.setItem('tc-theme', next); } catch (e) {}
+    paintThemeBtn();
+  });
+  paintThemeBtn();
+
+  // Init
+  compare();
+})();
+</script>
+</body>
+</html>
