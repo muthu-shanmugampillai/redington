@@ -1,0 +1,224 @@
+# AWS CLI – EC2 Infrastructure Activity Using CloudTrail
+
+## 1. Configure AWS CLI
+
+If AWS CLI is being used for the first time, configure the AWS credentials:
+
+```bash
+aws configure
+```
+
+It will prompt for:
+
+```text
+AWS Access Key ID [None]: <YOUR_AWS_ACCESS_KEY>
+AWS Secret Access Key [None]: <YOUR_AWS_SECRET_KEY>
+Default region name [None]: ap-south-1
+Default output format [None]: json
+```
+
+### Important
+
+Do not share the **AWS Access Key ID** or **AWS Secret Access Key** with anyone.
+
+---
+
+## 2. Verify AWS CLI Access
+
+After configuration, verify that the AWS CLI can successfully authenticate with AWS:
+
+```bash
+aws sts get-caller-identity
+```
+
+### Expected Output
+
+```json
+{
+    "UserId": "AIDAXXXXXXXXXXXXX",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:user/your-user"
+}
+```
+
+This confirms that the AWS CLI is authenticated and shows the AWS account and identity being used.
+
+---
+
+# 3. Check EC2 Infrastructure Activity Using CloudTrail
+
+AWS CLI + CloudTrail can be used to check infrastructure/API activity for a specific EC2 instance using its **Instance ID**.
+
+Replace:
+
+* `<INSTANCE_ID>` with the EC2 Instance ID
+* `<REGION_NAME>` with the AWS Region
+
+### Command
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceName,AttributeValue=<INSTANCE_ID> \
+  --region <REGION_NAME> \
+  --max-results 50 \
+  --query 'Events[].{Time:EventTime,Event:EventName,User:Username}' \
+  --output table
+```
+
+### Example
+
+For an instance:
+
+```text
+i-0123456789abcdef0
+```
+
+in:
+
+```text
+ap-south-1
+```
+
+run:
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceName,AttributeValue=i-0123456789abcdef0 \
+  --region ap-south-1 \
+  --max-results 50 \
+  --query 'Events[].{Time:EventTime,Event:EventName,User:Username}' \
+  --output table
+```
+
+### Expected Output
+
+```text
+---------------------------------------------------------------
+|                         LookupEvents                         |
++-------------------------+--------------------------+---------+
+| Time                    | Event                    | User    |
++-------------------------+--------------------------+---------+
+| 2026-10-08T06:30:25Z    | StartInstances           | ECCDEV_Sandbox_Saturday |
+| 2026-10-08T05:15:12Z    | StopInstances            | admin-user |
+| 2026-10-07T14:22:01Z    | ModifyInstanceAttribute  | DevOpsRole |
+| 2026-10-07T10:05:33Z    | RebootInstances          | automation-role |
++-------------------------+--------------------------+---------+
+```
+
+---
+
+# 4. What Information Can Be Seen?
+
+The CloudTrail output can help identify:
+
+| Information          | Example                   |
+| -------------------- | ------------------------- |
+| Activity/Event       | `StartInstances`          |
+| Time                 | `2026-10-08T06:30:25Z`    |
+| User/Role            | `DevOpsRole`              |
+| Instance action      | Start / Stop / Reboot     |
+| Configuration change | `ModifyInstanceAttribute` |
+
+Common EC2 infrastructure events include:
+
+```text
+StartInstances
+StopInstances
+RebootInstances
+TerminateInstances
+ModifyInstanceAttribute
+ModifyInstanceCreditSpecification
+AttachVolume
+DetachVolume
+```
+
+---
+
+# 5. Important Limitation
+
+CloudTrail shows **AWS API/infrastructure activity**.
+
+For example:
+
+```text
+Who started the EC2?
+        ↓
+CloudTrail
+        ↓
+StartInstances
+        ↓
+User/Role + Time
+```
+
+However, CloudTrail does **not** normally show detailed operating-system activity such as:
+
+* Who logged into Windows/Linux
+* Who deleted a file
+* Which Linux command was executed
+* Which Windows application was started
+* Application-level errors
+
+For those activities, use the appropriate OS, SSM, CloudWatch, or application logs.
+
+### Simple Difference
+
+**CloudTrail → AWS infrastructure activity**
+
+**OS/SSM/Application Logs → Server-level activity**
+
+---
+
+# 6. Quick Reference
+
+### Configure CLI
+
+```bash
+aws configure
+```
+
+### Verify AWS identity
+
+```bash
+aws sts get-caller-identity
+```
+
+### Check EC2 CloudTrail activity
+
+```bash
+aws cloudtrail lookup-events \
+  --lookup-attributes AttributeKey=ResourceName,AttributeValue=<INSTANCE_ID> \
+  --region <REGION_NAME> \
+  --max-results 50 \
+  --query 'Events[].{Time:EventTime,Event:EventName,User:Username}' \
+  --output table
+```
+
+### Example Region
+
+```text
+ap-south-1
+```
+
+### Example Instance ID
+
+```text
+i-0123456789abcdef0
+```
+
+---
+
+## Summary
+
+Using **AWS CLI + CloudTrail**, we can check the infrastructure/API activity associated with an EC2 instance and identify **what action happened, when it happened, and which user/role performed it**.
+
+For example:
+
+```text
+EC2 Instance
+     ↓
+CloudTrail
+     ↓
+Start / Stop / Reboot / Modify / Attach / Detach
+     ↓
+Time + User/Role
+```
