@@ -10,3 +10,46 @@ fi
  
 snap start amazon-ssm-agent
 ------------------------------------------------------------------------
+## 1. Configure AWS CLI
+
+If AWS CLI is being used for the first time, configure the AWS credentials:
+
+```bash
+aws configure
+```
+
+It will prompt for:
+
+```text
+AWS Access Key ID [None]: <YOUR_AWS_ACCESS_KEY>
+AWS Secret Access Key [None]: <YOUR_AWS_SECRET_KEY>
+Default region name [None]: ap-south-1
+Default output format [None]: json
+```
+
+### Important
+
+Do not share the **AWS Access Key ID** or **AWS Secret Access Key** with anyone.
+
+---
+
+## 2. Verify AWS CLI Access
+
+After configuration, verify that the AWS CLI can successfully authenticate with AWS:
+
+```bash
+aws sts get-caller-identity
+```
+
+### Expected Output
+
+```json
+{
+    "UserId": "AIDAXXXXXXXXXXXXX",
+    "Account": "123456789012",
+    "Arn": "arn:aws:iam::123456789012:user/your-user"
+}
+```
+
+This confirms that the AWS CLI is authenticated and shows the AWS account and identity being used.
+----------------------------------------------------------------------------------------------------------
