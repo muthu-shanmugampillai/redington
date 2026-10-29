@@ -1,0 +1,116 @@
+The problem is with an AWS SSL Certificate that is used for the domain:
+*.africaautoauction.ug
+AWS tried to renew the certificate automatically, but it failed because the required DNS validation record (CNAME) is missing or incorrect. If this is not fixed before 04-Nov-2026, the certificate will expire and the website/application using it may show security errors or become inaccessible.
+
+
+
+What You Need To Check
+Step 1: Login to AWS Console
+Login to AWS account:
+851725430573
+
+Step 2: Switch Region
+Top right corner → Region
+Select:
+Asia Pacific (Singapore) (ap-southeast-1) [FW: [aos.a...te renewal | Outlook]
+
+Step 3: Open Certificate Manager
+Search:
+Certificate Manager
+
+or
+ACM
+
+Open:
+AWS Certificate Manager
+
+Step 4: Find Certificate
+Search Certificate ARN ending with:
+943a4407-2124-4b95-84ec-ce41c8935b47
+
+AWS mentioned this certificate in the notification. [FW: [aos.a...te renewal | Outlook]
+Open it.
+
+Step 5: Check Certificate Status
+You will likely see:
+Pending Validation
+Renewal Pending
+Validation Failed
+Look for a section called:
+Domains
+
+or
+Renewal status
+
+
+Step 6: Expand Domain Details
+Expand:
+*.africaautoauction.ug
+
+AWS will show:
+CNAME Name
+CNAME Value
+
+Example:
+_xxxxx.africaautoauction.ug
+
+and
+_yyyyyy.acm-validations.aws
+
+(Actual values will be different.)
+
+Step 7: Check Where DNS Is Hosted
+Now determine:
+Is the domain DNS hosted in:
+AWS Route53?
+GoDaddy?
+Cloudflare?
+Namecheap?
+Some registrar?
+This is the most important step.
+
+Step 8A: If DNS is in Route53
+Open:
+Route53
+
+Hosted Zones
+Select:
+africaautoauction.ug
+
+Check whether the CNAME shown in ACM exists.
+
+Step 8B: If DNS is Outside AWS
+Login to the DNS provider.
+Examples:
+GoDaddy
+Cloudflare
+Namecheap
+Check whether the ACM CNAME record exists.
+
+Step 9: If Missing
+Create the exact CNAME record shown by ACM.
+Do not modify:
+Name
+Value
+Periods (. )
+Underscores (_)
+Copy exactly from ACM.
+
+Step 10: Wait
+After creating the CNAME:
+Wait:
+15 minutes
+Sometimes 30 minutes
+Occasionally up to 24 hours
+AWS should automatically detect it.
+
+Step 11: Verify
+Return to ACM.
+Certificate status should change to:
+Issued
+
+or
+Renewal Successful
+
+
+
