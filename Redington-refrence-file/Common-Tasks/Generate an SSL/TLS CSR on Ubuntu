@@ -1,0 +1,283 @@
+# Runbook: Generate an SSL/TLS CSR on Ubuntu
+
+## 1. Purpose
+
+This runbook explains how to generate a Certificate Signing Request (CSR) and its matching private key on an Ubuntu server using OpenSSL.
+
+You can use this procedure for any domain, such as:
+
+- `example.com`
+- `mycompany.com`
+- `app.mycompany.com`
+
+## 2. Prerequisites
+
+Before starting, ensure that you have:
+
+- Access to the Ubuntu server.
+- OpenSSL installed.
+- The correct domain name.
+- The required company and organization details.
+- A list of all hostnames the certificate must cover, including `www` or subdomains if required.
+
+## 3. Step-by-Step Procedure
+
+### Step 1: Check OpenSSL
+
+Run:
+
+```bash
+openssl version
+```
+
+**Expected output:**
+
+```text
+OpenSSL 3.0.x ...
+```
+The version may differ depending on the Ubuntu version.
+
+### Step 2: Switch to the root user
+
+Run:
+
+```bash
+sudo -i
+```
+
+**Expected result:** Your terminal opens a root shell. The prompt may look similar to:
+
+```text
+root@hostname:~#
+```
+
+### Step 3: Create a directory for the CSR files
+
+Run:
+
+```bash
+mkdir -p /root/ssl
+chmod 700 /root/ssl
+cd /root/ssl
+```
+
+**Expected result:** All commands complete without errors.
+
+Verify the current directory:
+
+```bash
+pwd
+```
+
+**Expected output:**
+
+```text
+/root/ssl
+```
+
+### Step 4: Identify your domain names
+
+Before generating the CSR, identify the hostname or hostnames that the certificate must cover.
+
+**Example:**
+
+- Main domain: `example.com`
+- Additional hostname: `www.example.com`
+
+Replace these example values with the actual hostnames required for your certificate.
+
+**Important:** Include only the hostnames that need to be covered. If you need a certificate for `app.example.com`, include that hostname as well. A certificate for `example.com` does not automatically cover every subdomain.
+
+### Step 5: Generate the private key and CSR
+
+Use the following common command:
+
+```bash
+openssl req -new -newkey rsa:2048 -sha256 -nodes \
+-keyout <YOUR-DOMAIN-NAME>.key \
+-out <YOUR-DOMAIN-NAME>.csr \
+-addext "subjectAltName=DNS:example.com,DNS:www.example.com"
+```
+
+**Before running the command, replace the placeholders and example domains with your actual values.**
+
+For example, if your domain is `mycompany.com`, use:
+
+```bash
+openssl req -new -newkey rsa:2048 -sha256 -nodes \
+-keyout mycompany.com.key \
+-out mycompany.com.csr \
+-addext "subjectAltName=DNS:mycompany.com,DNS:www.mycompany.com"
+```
+
+If your certificate needs to cover only one hostname, use:
+
+```bash
+openssl req -new -newkey rsa:2048 -sha256 -nodes \
+-keyout mycompany.com.key \
+-out mycompany.com.csr \
+-addext "subjectAltName=DNS:mycompany.com"
+```
+
+**What happens when you run this command?**
+
+OpenSSL generates the private key and CSR, then prompts you to enter the certificate details.
+
+The following two files are created in the current directory:
+
+- `mycompany.com.key` — private key.
+- `mycompany.com.csr` — Certificate Signing Request.
+
+The filenames are based on the values you provide after `-keyout` and `-out`. You can choose different filenames if required.
+
+**Note:** The `-nodes` option creates a private key without a passphrase. Protect the key carefully because anyone who obtains it may be able to use it for TLS operations.
+
+### Step 6: Enter the certificate details
+
+OpenSSL prompts you to enter information similar to the following:
+
+```text
+Country Name (2 letter code) []: IN
+State or Province Name (full name) []: Tamil Nadu
+Locality Name (eg, city) []: Chennai
+Organization Name (eg, company) []: Your Company Name
+Organizational Unit Name (eg, section) []: IT
+Common Name (e.g. server FQDN) []: mycompany.com
+Email Address []:
+```
+
+Enter the actual details approved for your organization and certificate request.
+
+| Field | What to enter |
+|---|---|
+| Country | Two-letter country code, e.g. `IN` |
+| State | Your state, e.g. `Tamil Nadu` |
+| City | Your city, e.g. `Chennai` |
+| Organization | Approved company name |
+| Organizational Unit | Department, if applicable |
+| Common Name (CN) | Main hostname, e.g. `mycompany.com` |
+| Email | Leave blank if not required |
+
+The SAN field will not be prompted because you supplied the hostname or hostnames in the command using `-addext`.
+
+**Important:** The Common Name does not replace SAN. Ensure the required hostnames are present in SAN.
+
+### Step 7: Protect the private key
+
+Use the filenames you specified in Step 5.
+
+For the example `mycompany.com`, run:
+
+```bash
+chmod 600 mycompany.com.key
+chmod 644 mycompany.com.csr
+```
+
+**Expected result:** The commands complete without error messages.
+
+The private key is restricted to its owner. Keep it secure and do not email or share it with the Certificate Authority.
+
+### Step 8: Verify the generated files
+
+Run:
+
+```bash
+ls -l mycompany.com.key mycompany.com.csr
+```
+
+**Expected output:**
+
+```text
+-rw-r--r-- 1 root root ... mycompany.com.csr
+-rw------- 1 root root ... mycompany.com.key
+```
+
+File sizes, timestamps and other details may differ.
+
+If you used different filenames in Step 5, replace the filenames in this command accordingly.
+
+### Step 9: Verify the CSR details
+
+Run:
+
+```bash
+openssl req -in mycompany.com.csr -noout -text
+```
+
+Check the following:
+
+- The Common Name is correct.
+- The public key algorithm is RSA.
+- The key size is 2048 bits.
+- The organization details are correct.
+- SAN contains all required hostnames.
+
+**Expected SAN example:**
+
+```text
+X509v3 Subject Alternative Name:
+    DNS:mycompany.com, DNS:www.mycompany.com
+```
+
+If any hostname is missing or incorrect, generate a corrected CSR before submitting it to the CA.
+
+### Step 10: Verify the CSR signature
+
+Run:
+
+```bash
+openssl req -in mycompany.com.csr -noout -verify
+```
+
+**Expected output:**
+
+```text
+Certificate request self-signature verify OK
+```
+
+This confirms that the CSR signature is valid. It does not mean that the Certificate Authority has approved or issued the certificate.
+
+### Step 11: Display and submit the CSR
+
+Run:
+
+```bash
+cat mycompany.com.csr
+```
+
+**Expected output format:**
+
+```text
+-----BEGIN CERTIFICATE REQUEST-----
+...encoded request data...
+-----END CERTIFICATE REQUEST-----
+```
+
+Copy the complete CSR, including the BEGIN and END lines, and submit it through your approved Certificate Authority process.
+
+**Never send the private key (`.key`) to the Certificate Authority.**
+
+## 4. Final Output
+
+| File | Purpose | Required action |
+|---|---|---|
+| `mycompany.com.key` | Private key | Keep secure |
+| `mycompany.com.csr` | Certificate request | Submit to the CA |
+
+The filenames above are examples. Your actual filenames depend on the values supplied in Step 5.
+
+## 5. After CSR Creation
+
+1. Submit the CSR to the Certificate Authority.
+2. Complete domain or organization validation as required.
+3. Receive the signed server certificate and any intermediate certificates.
+4. Preserve the private key that matches the CSR.
+5. Configure Apache, Nginx or the appropriate TLS termination service using the certificate and matching private key.
+6. Test HTTPS and verify the hostname and certificate chain.
+
+**Important:** Creating a CSR does not activate HTTPS. The certificate must be issued and correctly installed and configured.
+
+## 6. Security Reminder
+
+If you are renewing a production certificate, first identify which private key the existing certificate uses. Do not overwrite or replace an active private key without confirming the impact and planning the change.
+
