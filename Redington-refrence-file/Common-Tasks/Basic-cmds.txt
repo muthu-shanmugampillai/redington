@@ -53,3 +53,13 @@ aws sts get-caller-identity
 
 This confirms that the AWS CLI is authenticated and shows the AWS account and identity being used.
 ----------------------------------------------------------------------------------------------------------
+
+dowmlaod the file from linux to local
+
+scp -i "PEM_FILE_PATH" USERNAME@PUBLIC_IP:SOURCE_FILE_PATH DESTINATION_PATH
+
+
+eg:
+scp -i "/c/Users/muthu.shanmugam/Downloads/testing-server-key.pem" ec2-user@100.58.117.105:/tmp/tmp_backup.tar.gz "/c/Users/muthu.shanmugam/Downloads/"
+
+------------------------------------------------------------------------------------------------------------------------------------------
